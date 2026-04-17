@@ -1,0 +1,119 @@
+version: '3.8'
+services:
+  pitstop-customer-database:
+    image: mysql:latest
+    env_file:
+      - ./pitstop-customer/.env
+    volumes:
+      - customer-db:/var/lib/mysql
+      - ./pitstop-customer/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - netpitstop
+    ports:
+      - "3306:3306"
+
+  pitstop-vehicle-database:
+    image: mysql:latest
+    env_file:
+      - ./pitstop-vehicle/.env
+    volumes:
+      - vehicle-db:/var/lib/mysql
+      - ./pitstop-vehicle/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - netpitstop
+    ports:
+      - "3307:3306"
+
+  pitstop-workshop-database:
+    image: mysql:latest
+    env_file:
+      - ./pitstop-workshop-planning/.env
+    volumes:
+      - workshop-db:/var/lib/mysql
+      - ./pitstop-workshop-planning/init.sql:/docker-entrypoint-initdb.d/init.sql
+    networks:
+      - netpitstop
+    ports:
+      - "3308:3306"
+
+  broker-rabbitmq:
+    image: rabbitmq:management
+    networks:
+      - netpitstop
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+
+  pitstop-customer-service:
+    build:
+      context: ./pitstop-customer/
+      dockerfile: Dockerfile
+    env_file:
+      - ./pitstop-customer/.env
+    depends_on:
+      - pitstop-customer-database
+    networks:
+      - netpitstop
+    ports:
+      - "3001:3001"
+
+  pitstop-vehicle-service:
+    build:
+      context: ./pitstop-vehicle/
+      dockerfile: Dockerfile
+    env_file:
+      - ./pitstop-vehicle/.env
+    depends_on:
+      - pitstop-vehicle-database
+    networks:
+      - netpitstop
+    ports:
+      - "3002:3002"
+
+  pitstop-workshop-service:
+    build:
+      context: ./pitstop-workshop-planning/
+      dockerfile: Dockerfile
+    env_file:
+      - ./pitstop-workshop-planning/.env
+    depends_on:
+      - pitstop-workshop-database
+    networks:
+      - netpitstop
+    ports:
+      - "3003:3003"
+
+  pitstop-gateway:
+    build:
+      context: ./pitstop-express-gateway/
+      dockerfile: Dockerfile
+    depends_on:
+      - pitstop-customer-service
+      - pitstop-vehicle-service
+      - pitstop-workshop-service
+    networks:
+      - netpitstop
+    ports:
+      - "8080:8080"
+
+  pitstop-webapp:
+    build:
+      context: ./pitstop-webapp/
+      dockerfile: Dockerfile
+    depends_on:
+      - pitstop-gateway
+    networks:
+      - netpitstop
+    ports:
+      - "8081:80"
+
+networks:
+  netpitstop:
+
+volumes:
+  customer-db:
+  vehicle-db:
+  workshop-db:
+  rabbitmq-data:
